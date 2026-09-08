@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catálogo de Imóveis Disponíveis — IS Engenharia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{
+    --bg:#12161A;
+    --surface:#1B2127;
+    --surface-alt:#232B32;
+    --border:#2B333B;
+    --text:#ECE7DE;
+    --text-muted:#8B95A1;
+    --accent:#E8592A;
+    --accent-blue:#4F86B8;
+    --available:#4F9D69;
+    --sold:#B0524A;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;line-height:1.45;}
+  h1,h2,h3,.display{font-family:'Space Grotesk',system-ui,sans-serif;font-weight:600;letter-spacing:-0.01em;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  a{color:inherit;}
+
+  header{padding:28px 24px 20px;border-bottom:1px solid var(--border);}
+  .header-inner{max-width:1280px;margin:0 auto;}
+  header h1{font-size:1.55rem;margin:0 0 4px;}
+  header p.sub{margin:0;color:var(--text-muted);font-size:0.92rem;max-width:640px;}
+  .brand-row{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;}
+  .contact-btns{display:flex;gap:8px;flex-wrap:wrap;}
+  .contact-chip{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--text);border:1px solid var(--border);padding:6px 10px;white-space:nowrap;text-decoration:none;cursor:pointer;}
+  .contact-chip:hover{border-color:var(--accent);color:var(--accent);}
+
+  .filters{max-width:1280px;margin:18px auto 0;padding:0 24px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .filters select{background:var(--surface);color:var(--text);border:1px solid var(--border);padding:9px 12px;font-family:'Inter',sans-serif;font-size:0.88rem;min-width:190px;}
+  .filters .count{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:0.82rem;color:var(--text-muted);}
+  .view-toggle{display:none;gap:0;border:1px solid var(--border);overflow:hidden;}
+  .view-toggle button{background:var(--surface);color:var(--text-muted);border:none;padding:9px 14px;font-family:'Inter',sans-serif;font-size:0.85rem;cursor:pointer;}
+  .view-toggle button.active{background:var(--accent);color:#12161A;font-weight:600;}
+
+  main{max-width:1280px;margin:20px auto 12px;padding:0 24px;display:grid;grid-template-columns:460px 1fr;gap:20px;align-items:start;}
+  .map-col{position:sticky;top:20px;}
+  .subtabs{display:flex;border:1px solid var(--border);overflow:hidden;margin-bottom:10px;}
+  .subtabs button{flex:1;background:var(--surface);color:var(--text-muted);border:none;padding:9px 10px;font-family:'Inter',sans-serif;font-size:0.83rem;font-weight:600;cursor:pointer;}
+  .subtabs button.active{background:var(--surface-alt);color:var(--text);border-bottom:2px solid var(--accent);}
+
+  #map{height:min(52vh, 430px);min-height:320px;border:1px solid var(--border);}
+  .leaflet-tile-pane{filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.85);}
+
+  #plantaView{display:none;border:1px solid var(--border);background:var(--surface);padding:14px;max-height:min(52vh,430px);overflow-y:auto;}
+  .planta-group{margin-bottom:18px;}
+  .planta-group:last-child{margin-bottom:0;}
+  .planta-group h4{font-size:0.85rem;margin:0 0 2px;font-family:'Space Grotesk',sans-serif;}
+  .planta-group .planta-sub{font-size:0.74rem;color:var(--text-muted);margin-bottom:8px;}
+  .planta-row{display:grid;gap:6px;}
+  .planta-cell{height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid var(--border);cursor:pointer;text-align:center;padding:4px;}
+  .planta-cell.nolink{cursor:default;}
+  .planta-cell .lbl{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:0.76rem;color:#0F1417;}
+  .planta-cell .st{font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:#0F1417;opacity:0.75;}
+  .planta-cell.disponivel{background:var(--available);}
+  .planta-cell.vendida{background:var(--sold);}
+  .planta-cell.construcao{background:var(--accent-blue);}
+
+  .map-legend{display:flex;gap:16px;flex-wrap:wrap;padding:10px 2px;font-size:0.76rem;color:var(--text-muted);}
+  .map-legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .map-note{font-size:0.72rem;color:var(--text-muted);border-top:1px solid var(--border);padding-top:8px;margin-top:2px;}
+
+  .leaflet-popup-content-wrapper{background:var(--surface);color:var(--text);border-radius:2px;font-family:'Inter',sans-serif;}
+  .leaflet-popup-tip{background:var(--surface);}
+  .popup-title{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:0.92rem;margin-bottom:2px;}
+  .popup-sub{color:var(--text-muted);font-size:0.78rem;}
+
+  .list{display:flex;flex-direction:column;gap:18px;}
+  .group-label{font-family:'IBM Plex Mono',monospace;font-size:0.75rem;letter-spacing:0.04em;color:var(--text-muted);padding-top:6px;border-top:1px solid var(--border);}
+  .group-label:first-child{border-top:none;padding-top:0;}
+  .group-label .btn{font-family:'Inter',sans-serif;letter-spacing:normal;}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--available);padding:16px 18px;}
+  .card.status-construcao{border-left-color:var(--accent-blue);}
+  .card.highlight{background:var(--surface-alt);outline:1px solid var(--accent);}
+  .card-top{display:grid;grid-template-columns:1fr auto;gap:12px;cursor:pointer;}
+
+  .card-main h3{font-size:1.02rem;margin:0 0 2px;}
+  .card-main .addr-sub{color:var(--text-muted);font-size:0.82rem;margin-bottom:8px;}
+  .status-badge{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:0.7rem;letter-spacing:0.03em;padding:2px 7px;border:1px solid var(--available);color:var(--available);margin-bottom:8px;}
+  .status-badge.construcao{border-color:var(--accent-blue);color:var(--accent-blue);}
+
+  .specs{display:flex;gap:16px;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;font-size:0.8rem;color:var(--text-muted);margin-bottom:10px;}
+  .specs b{color:var(--text);font-weight:500;}
+
+  .desc{font-size:0.85rem;color:var(--text-muted);margin-bottom:10px;}
+  .desc ul{margin:0;padding-left:18px;}
+  .desc li{margin-bottom:2px;}
+
+  .price-block{text-align:right;min-width:170px;}
+  .price-block .venda{font-family:'IBM Plex Mono',monospace;font-size:1.1rem;font-weight:500;color:var(--text);}
+  .price-block .venda.consulte{font-size:0.85rem;color:var(--accent);}
+  .price-block .aval{font-family:'IBM Plex Mono',monospace;font-size:0.73rem;color:var(--text-muted);margin-top:2px;}
+  .price-block .comissao{font-size:0.72rem;color:var(--text-muted);margin-top:4px;}
+
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;}
+  .btn{display:inline-flex;align-items:center;gap:6px;font-family:'Inter',sans-serif;font-size:0.82rem;font-weight:600;padding:8px 14px;text-decoration:none;border:1px solid var(--border);color:var(--text);background:transparent;cursor:pointer;}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#12161A;}
+  .btn:hover{filter:brightness(1.1);}
+
+  footer{max-width:1280px;margin:0 auto 40px;padding:16px 24px;color:var(--text-muted);font-size:0.78rem;border-top:1px solid var(--border);padding-top:16px;}
+  footer p{margin:0 0 6px;}
+
+  @media (max-width:900px){
+    main{grid-template-columns:1fr;}
+    .map-col{position:relative;top:0;}
+    main.view-list .map-col{display:none;}
+    main.view-map .list{display:none;}
+    .view-toggle{display:flex;}
+    .price-block{text-align:left;}
+    .card-top{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="brand-row">
+      <div>
+        <h1>Catálogo de Imóveis Disponíveis — IS Engenharia</h1>
+        <p class="sub">IS Engenharia e Construção — atualizado em 08/09/2026. Clique num pino, num lote da planta ou num card para ver os detalhes.</p>
+      </div>
+      <div class="contact-btns"><a class="contact-chip" href="https://wa.me/5562984900083?text=Ol%C3%A1%21%20Vi%20o%20cat%C3%A1logo%20de%20im%C3%B3veis%20da%20IS%20Engenharia%20e%20gostaria%20de%20mais%20informa%C3%A7%C3%B5es.">IS COMERCIAL · (62) 98490-0083</a><a class="contact-chip" href="https://wa.me/5562999969620?text=Ol%C3%A1%20C%C3%A9lio%2C%20sou%20corretor%28a%29%20e%20preciso%20de%20informa%C3%A7%C3%B5es%20sobre%20o%20AT%20Home%20Residence.">CÉLIO (AT HOME) · (62) 99996-9620</a></div>
+    </div>
+  </div>
+</header>
+
+<div class="filters">
+  <select id="filterBairro"></select>
+  <select id="filterSituacao">
+    <option value="todas">Todas as situações</option>
+    <option value="CONCLUÍDA">Concluída</option>
+    <option value="EM CONSTRUÇÃO">Em construção</option>
+  </select>
+  <select id="filterOrdenar">
+    <option value="bairro">Ordenar: bairro</option>
+    <option value="menor">Ordenar: menor valor</option>
+    <option value="maior">Ordenar: maior valor</option>
+  </select>
+  <div class="view-toggle">
+    <button id="btnViewMap">Mapa/Planta</button>
+    <button id="btnViewList" class="active">Lista</button>
+  </div>
+  <span class="count" id="resultCount"></span>
+</div>
+
+<main id="mainGrid" class="view-list">
+  <div class="map-col">
+    <div class="subtabs">
+      <button id="tabMapa" class="active">Mapa real</button>
+      <button id="tabPlanta">Planta dos lotes</button>
+    </div>
+    <div id="map"></div>
+    <div id="plantaView"></div>
+    <div class="map-legend">
+      <span><i class="dot" style="background:#4F9D69"></i>Disponível</span>
+      <span><i class="dot" style="background:#B0524A"></i>Vendida</span>
+      <span><i class="dot" style="background:#4F86B8"></i>Em construção</span>
+    </div>
+    <div class="map-note" id="mapNote">Pinos conferidos pelos links do Google Maps enviados por você. Mapa base sem chave de API (OpenStreetMap).</div>
+  </div>
+  <div class="list" id="list"></div>
+</main>
+
+<footer>
+  <p>Comissão de 5% inclusa nos valores de venda das unidades de revenda. Unidades do AT Home Residence seguem tabela própria da incorporação (entrada + financiamento Caixa).</p>
+  <p>Divulgação restrita — não autorizada em portais (OLX, ZAP Imóveis e similares). Preços conferidos em 08/09/2026.</p>
+</footer>
+
+<script>
+const AT_HOME_DESC = [
+  "Sobrados não geminados",
+  "3 suítes plenas, sendo 1 master com sacada",
+  "Garagem coberta para 2 carros",
+  "Sala de estar e jantar integradas",
+  "Condomínio com guarita, churrasqueira, piscina e playground"
+];
+
+const properties = [
+  { id:"athome-01", empreendimento:"Condomínio AT Home", bairro:"Bairro Anhanguera (Goiânia)",
+    endereco:"Rua Machado de Assis, Q.10, L.25-27-29 — Casa 01 (decorado)", casa:"01", destaque:"decorado",
+    situacao:"EM CONSTRUÇÃO", areaConstruida:138.90, areaLote:120.04, areaPrivativa:186.84,
+    descricao: AT_HOME_DESC, valorVenda:1210000, entrada:242000, financiamento:968000,
+    fotosUrl:"https://drive.google.com/drive/folders/143pX3Eec6ofa0b9o9aUVL6p4M5JY1J3C?usp=sharing", lat:-16.7196569, lng:-49.2973828, mapMarkerId:"athome", lotPlan:{
+      loteTotalM2:1435.80, cols:2, units:[
+        {label:"Casa 04", status:"vendida"}, {label:"Casa 08", status:"disponível", id:"athome-08"},
+        {label:"Casa 03", status:"vendida"}, {label:"Casa 07", status:"disponível", id:"athome-07"},
+        {label:"Casa 02", status:"disponível", id:"athome-02"}, {label:"Casa 06", status:"disponível", id:"athome-06"},
+        {label:"Casa 01", status:"disponível", id:"athome-01"}, {label:"Casa 05", status:"disponível", id:"athome-05"}
+      ]
+    } },
+  { id:"athome-02", empreendimento:"Condomínio AT Home", bairro:"Bairro Anhanguera (Goiânia)",
+    endereco:"Rua Machado de Assis, Q.10, L.25-27-29 — Casa 02", casa:"02",
+    situacao:"EM CONSTRUÇÃO", areaConstruida:138.90, areaLote:120.04, areaPrivativa:186.84,
+    descricao: AT_HOME_DESC, valorVenda:1050000, entrada:210000, financiamento:840000,
+    fotosUrl:"https://drive.google.com/drive/folders/1uI2KReqvcWCwY6QmX7GOQExWMmfgAE0s?usp=sharing", lat:-16.7196569, lng:-49.2973828, mapMarkerId:"athome", lotPlan:null },
+  { id:"athome-05", empreendimento:"Condomínio AT Home", bairro:"Bairro Anhanguera (Goiânia)",
+    endereco:"Rua Machado de Assis, Q.10, L.25-27-29 — Casa 05", casa:"05",
+    situacao:"EM CONSTRUÇÃO", areaConstruida:138.90, areaLote:120.04, areaPrivativa:186.84,
+    descricao: AT_HOME_DESC, valorVenda:1050000, entrada:210000, financiamento:840000,
+    fotosUrl:"https://drive.google.com/drive/folders/1uI2KReqvcWCwY6QmX7GOQExWMmfgAE0s?usp=sharing", lat:-16.7196569, lng:-49.2973828, mapMarkerId:"athome", lotPlan:null },
+  { id:"athome-06", empreendimento:"Condomínio AT Home", bairro:"Bairro Anhanguera (Goiânia)",
+    endereco:"Rua Machado de Assis, Q.10, L.25-27-29 — Casa 06", casa:"06",
+    situacao:"EM CONSTRUÇÃO", areaConstruida:138.90, areaLote:120.04, areaPrivativa:186.84,
+    descricao: AT_HOME_DESC, valorVenda:1050000, entrada:210000, financiamento:840000,
+    fotosUrl:"https://drive.google.com/drive/folders/1uI2KReqvcWCwY6QmX7GOQExWMmfgAE0s?usp=sharing", lat:-16.7196569, lng:-49.2973828, mapMarkerId:"athome", lotPlan:null },
+  { id:"athome-07", empreendimento:"Condomínio AT Home", bairro:"Bairro Anhanguera (Goiânia)",
+    endereco:"Rua Machado de Assis, Q.10, L.25-27-29 — Casa 07", casa:"07",
+    situacao:"EM CONSTRUÇÃO", areaConstruida:138.90, areaLote:120.04, areaPrivativa:186.84,
+    descricao: AT_HOME_DESC, valorVenda:1050000, entrada:210000, financiamento:840000,
+    fotosUrl:"https://drive.google.com/drive/folders/1uI2KReqvcWCwY6QmX7GOQExWMmfgAE0s?usp=sharing", lat:-16.7196569, lng:-49.2973828, mapMarkerId:"athome", lotPlan:null },
+  { id:"athome-08", empreendimento:"Condomínio AT Home", bairro:"Bairro Anhanguera (Goiânia)",
+    endereco:"Rua Machado de Assis, Q.10, L.25-27-29 — Casa 08", casa:"08",
+    situacao:"EM CONSTRUÇÃO", areaConstruida:138.90, areaLote:123.04, areaPrivativa:189.84,
+    descricao: AT_HOME_DESC, valorVenda:1050000, entrada:210000, financiamento:840000,
+    fotosUrl:"https://drive.google.com/drive/folders/1uI2KReqvcWCwY6QmX7GOQExWMmfgAE0s?usp=sharing", lat:-16.7196569, lng:-49.2973828, mapMarkerId:"athome", lotPlan:null },
+
+  { id:"ns09-2", empreendimento:"Obra IS 5 — Res. Nossa Senhora Auxiliadora", bairro:"Res. Nossa Senhora Auxiliadora (Goiânia)",
+    endereco:"Rua NS-09, QD.08, LT.03", casa:"2",
+    situacao:"CONCLUÍDA", areaConstruida:65.62, areaLote:100, areaPrivativa:null,
+    descricao:["Casa térrea, piso em porcelanato","2 quartos, sendo 1 com suíte","Cozinha, área de serviço","Quintal"],
+    valorVenda:246500, valorAvaliacao:289032.18,
+    fotosUrl:"https://drive.google.com/drive/folders/1Td_4xqw1vRUawCAPz68gIeZc_srtssPM?usp=sharing",
+    lat:-16.7005863, lng:-49.4065399, mapMarkerId:"ns09",
+    lotPlan:{ loteTotalM2:200, cols:2, units:[
+      {label:"Casa 1", status:"vendida"}, {label:"Casa 2", status:"disponível", id:"ns09-2"}
+    ]} },
+
+  { id:"abadia-l43b", empreendimento:"Res. Jardim Primavera", bairro:"Abadia de Goiás",
+    endereco:"Rua P-11, QD.15, L43B", casa:null,
+    situacao:"CONCLUÍDA", areaConstruida:80, areaLote:138, areaPrivativa:null,
+    descricao:["Casa térrea, piso em porcelanato","2 quartos, cozinha, churrasqueira","Sala, quintal, área de serviço","Garagem coberta"],
+    valorVenda:231000, valorAvaliacao:280000,
+    fotosUrl:"https://drive.google.com/drive/folders/1rpsB--5VfmVUQ7iNVSVP5DdUPDtEfa5-?usp=sharing",
+    lat:-16.7908497, lng:-49.4240074, mapMarkerId:"abadia-l43b", lotLabel:"QD.15 L43B", lotPlan:null },
+  { id:"abadia-l32a", empreendimento:"Res. Jardim Primavera", bairro:"Abadia de Goiás",
+    endereco:"Rua P-27, QD.09, L32A", casa:null,
+    situacao:"CONCLUÍDA", areaConstruida:80, areaLote:138, areaPrivativa:null,
+    descricao:["Casa térrea, piso em porcelanato","2 quartos, cozinha, churrasqueira","Sala, quintal, área de serviço","Garagem coberta"],
+    valorVenda:240000, valorAvaliacao:292000,
+    fotosUrl:"https://drive.google.com/drive/folders/1rpsB--5VfmVUQ7iNVSVP5DdUPDtEfa5-?usp=sharing",
+    lat:-16.7918129, lng:-49.4193039, mapMarkerId:"abadia-l32a", lotLabel:"QD.09 L32A", lotPlan:null },
+  { id:"abadia-l33a", empreendimento:"Res. Jardim Primavera", bairro:"Abadia de Goiás",
+    endereco:"Rua P-27, QD.09, L33A", casa:null,
+    situacao:"CONCLUÍDA", areaConstruida:80, areaLote:138, areaPrivativa:null,
+    descricao:["Casa térrea, piso em porcelanato","2 quartos, cozinha, churrasqueira","Sala, quintal, área de serviço"],
+    valorVenda:200000, valorAvaliacao:205000,
+    fotosUrl:"https://drive.google.com/drive/folders/1rpsB--5VfmVUQ7iNVSVP5DdUPDtEfa5-?usp=sharing",
+    lat:-16.7920500, lng:-49.4194500, mapMarkerId:"abadia-l33a", lotLabel:"QD.09 L33A", lotPlan:null }
+];
+
+const WHATSAPP_NUMBER = "5562984900083";
+const CELIO_NUMBER = "5562999969620";
+const ATHOME_RENDERS_URL = "https://drive.google.com/drive/folders/11vUwlbAcZ-gd66KViOy7ziBG51LySVRK?usp=sharing";
+const fmtBRL = v => v == null ? null : v.toLocaleString('pt-BR', {style:'currency', currency:'BRL', maximumFractionDigits:0});
+
+function waLink(p){
+  const casaTxt = p.casa ? ` (casa ${p.casa})` : "";
+  const msg = `Olá! Tenho interesse no imóvel em ${p.endereco}${casaTxt} — ${p.empreendimento}. Pode me passar mais informações?`;
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
+}
+function celioLink(){
+  return `https://wa.me/${CELIO_NUMBER}?text=${encodeURIComponent('Olá Célio, sou corretor(a) e preciso de informações sobre o AT Home Residence.')}`;
+}
+function statusClassOf(status){
+  if(status === "disponível") return "disponivel";
+  if(status === "vendida") return "vendida";
+  return "construcao";
+}
+
+// --- Marker groups + map (wrapped: a blocked/offline viewer must not break the list) ---
+let map = null;
+const markers = {};
+try {
+  // --- Marker groups (dedupe by mapMarkerId so multi-unit empreendimentos get one pin) ---
+  const markerGroups = {};
+  properties.forEach(p => {
+    const mid = p.mapMarkerId || p.id;
+    if(!markerGroups[mid]) markerGroups[mid] = { lat:p.lat, lng:p.lng, empreendimento:p.empreendimento, ids:[p.id] };
+    else markerGroups[mid].ids.push(p.id);
+  });
+  const groupEntries = Object.entries(markerGroups);
+  const gLats = groupEntries.map(([,g]) => g.lat), gLngs = groupEntries.map(([,g]) => g.lng);
+  const bounds = [[Math.min(...gLats), Math.min(...gLngs)], [Math.max(...gLats), Math.max(...gLngs)]];
+  const map = L.map('map', {scrollWheelZoom:false}).fitBounds(bounds, {padding:[36,36]});
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
+  }).addTo(map);
+  
+  function groupColor(mid){
+    const anyConcluida = properties.some(p => (p.mapMarkerId||p.id) === mid && p.situacao === "CONCLUÍDA");
+    return anyConcluida ? "#4F9D69" : "#4F86B8";
+  }
+  groupEntries.forEach(([mid, g]) => {
+    const color = groupColor(mid);
+    const icon = L.divIcon({
+      className:'',
+      html:`<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid #12161A;box-shadow:0 0 0 2px ${color}55;"></div>`,
+      iconSize:[14,14], iconAnchor:[7,7]
+    });
+    const m = L.marker([g.lat, g.lng], {icon}).addTo(map);
+    const label = g.ids.length > 1 ? `${g.empreendimento} · ${g.ids.length} unidades disponíveis` : g.empreendimento;
+    m.bindPopup(`<div class="popup-title">${label}</div><div class="popup-sub">Clique no card na lista pra ver detalhes</div>`);
+    markers[mid] = m;
+  });
+} catch(err) {
+  console.warn('Mapa indisponível neste visualizador:', err);
+  const mapEl = document.getElementById('map');
+  if(mapEl) mapEl.innerHTML = '<div style="padding:18px;color:#8B95A1;font-size:0.82rem;line-height:1.5">Mapa indisponível neste visualizador (sem acesso à internet aqui dentro). Abra o link publicado no navegador (Safari/Chrome) para ver o mapa — a lista e a planta dos lotes funcionam normalmente.</div>';
+}
+
+function highlightCard(id){
+  document.querySelectorAll('.card').forEach(c => c.classList.remove('highlight'));
+  const card = document.getElementById('card-'+id);
+  if(card){ card.classList.add('highlight'); card.scrollIntoView({behavior:'smooth', block:'center'}); }
+}
+function focusMarker(p){
+  if(!map || !p) return;
+  const mid = p.mapMarkerId || p.id;
+  const m = markers[mid];
+  if(m){ m.openPopup(); map.setView(m.getLatLng(), 16); }
+}
+
+// --- Planta view ---
+function buildPlantaView(){
+  const groups = {};
+  properties.forEach(p => { (groups[p.empreendimento] ||= []).push(p); });
+
+  document.getElementById('plantaView').innerHTML = Object.entries(groups).map(([emp, items]) => {
+    const withPlan = items.find(p => p.lotPlan);
+    let rowHtml, subLabel, cols;
+
+    if(withPlan){
+      cols = withPlan.lotPlan.cols || withPlan.lotPlan.units.length;
+      subLabel = `Lote de ${withPlan.lotPlan.loteTotalM2} m² — ${withPlan.endereco.split(' — ')[0]}`;
+      rowHtml = withPlan.lotPlan.units.map(u => {
+        const cls = statusClassOf(u.status);
+        const clickable = u.id ? `onclick="focusMarker(properties.find(p=>p.id==='${u.id}'));highlightCard('${u.id}');"` : '';
+        return `<div class="planta-cell ${cls} ${u.id?'':'nolink'}" ${clickable}>
+          <div class="lbl">${u.label}</div><div class="st">${u.status}</div>
+        </div>`;
+      }).join('');
+    } else {
+      cols = Math.min(items.length, 3);
+      subLabel = items[0].bairro;
+      rowHtml = items.map(p => {
+        const cls = statusClassOf(p.situacao === "CONCLUÍDA" ? "disponível" : "em construção");
+        return `<div class="planta-cell ${cls}" onclick="focusMarker(properties.find(p=>p.id==='${p.id}'));highlightCard('${p.id}');">
+          <div class="lbl">${p.lotLabel || p.endereco}</div><div class="st">${fmtBRL(p.valorVenda) || ''}</div>
+        </div>`;
+      }).join('');
+    }
+
+    return `<div class="planta-group">
+      <h4>${emp}</h4>
+      <div class="planta-sub">${subLabel}</div>
+      <div class="planta-row" style="grid-template-columns:repeat(${cols},1fr)">${rowHtml}</div>
+    </div>`;
+  }).join('');
+}
+buildPlantaView();
+
+document.getElementById('tabMapa').addEventListener('click', e => {
+  document.getElementById('map').style.display = 'block';
+  document.getElementById('plantaView').style.display = 'none';
+  e.target.classList.add('active');
+  document.getElementById('tabPlanta').classList.remove('active');
+  document.getElementById('mapNote').textContent = 'Pinos conferidos pelos links do Google Maps enviados por você. Mapa base sem chave de API (OpenStreetMap).';
+  if(map) setTimeout(() => map.invalidateSize(), 150);
+});
+document.getElementById('tabPlanta').addEventListener('click', e => {
+  document.getElementById('map').style.display = 'none';
+  document.getElementById('plantaView').style.display = 'block';
+  e.target.classList.add('active');
+  document.getElementById('tabMapa').classList.remove('active');
+  document.getElementById('mapNote').textContent = 'Esquema ilustrativo por lote/empreendimento — não é o levantamento topográfico exato, exceto onde há projeto executivo (AT Home e NS-09).';
+});
+
+// --- Filters ---
+const bairroSel = document.getElementById('filterBairro');
+const situacaoSel = document.getElementById('filterSituacao');
+const ordenarSel = document.getElementById('filterOrdenar');
+const listEl = document.getElementById('list');
+const countEl = document.getElementById('resultCount');
+
+const bairros = ["todos", ...new Set(properties.map(p => p.bairro))];
+bairroSel.innerHTML = bairros.map(b => `<option value="${b}">${b === "todos" ? "Todos os bairros/empreendimentos" : b}</option>`).join('');
+
+function render(){
+  const bFilter = bairroSel.value, sFilter = situacaoSel.value, ord = ordenarSel.value;
+  let items = properties.filter(p => (bFilter === "todos" || p.bairro === bFilter) && (sFilter === "todas" || p.situacao === sFilter));
+
+  if(ord === "menor") items.sort((a,b) => (a.valorVenda ?? Infinity) - (b.valorVenda ?? Infinity));
+  else if(ord === "maior") items.sort((a,b) => (b.valorVenda ?? -Infinity) - (a.valorVenda ?? -Infinity));
+  else items.sort((a,b) => a.bairro.localeCompare(b.bairro) || a.endereco.localeCompare(b.endereco));
+
+  countEl.textContent = `${items.length} unidade${items.length === 1 ? '' : 's'}`;
+
+  let lastGroup = null;
+  listEl.innerHTML = items.map(p => {
+    let groupHtml = '';
+    if(p.bairro !== lastGroup){
+      const isAtHomeGroup = p.bairro === "Bairro Anhanguera (Goiânia)";
+      const celioBtn = isAtHomeGroup
+        ? ` <a class="btn" style="padding:2px 8px;font-size:0.7rem" href="${celioLink()}">Falar com Célio (gestor)</a>` : '';
+      const rendersBtn = isAtHomeGroup
+        ? ` <a class="btn" style="padding:2px 8px;font-size:0.7rem" href="${ATHOME_RENDERS_URL}" target="_blank" rel="noopener">Renders externos</a>` : '';
+      groupHtml = `<div class="group-label" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">${p.bairro.toUpperCase()}${celioBtn}${rendersBtn}</div>`;
+      lastGroup = p.bairro;
+    }
+    const statusClass = p.situacao === "CONCLUÍDA" ? "" : "status-construcao";
+    const badgeClass = p.situacao === "CONCLUÍDA" ? "" : "construcao";
+
+    let priceHtml;
+    if(p.valorVenda != null && p.entrada != null){
+      priceHtml = `<div class="venda">${fmtBRL(p.valorVenda)}</div><div class="aval">Entrada ${fmtBRL(p.entrada)}</div><div class="aval">Financ. ${fmtBRL(p.financiamento)}</div>`;
+    } else if(p.valorVenda != null){
+      priceHtml = `<div class="venda">${fmtBRL(p.valorVenda)}</div><div class="aval">Aval. Caixa: ${fmtBRL(p.valorAvaliacao)}</div><div class="comissao">5% de comissão inclusa</div>`;
+    } else {
+      priceHtml = `<div class="venda consulte">Consulte tabela vigente</div>`;
+    }
+
+    const fotosBtn = p.fotosUrl
+      ? `<a class="btn primary" href="${p.fotosUrl}" target="_blank" rel="noopener">Ver fotos</a>`
+      : `<a class="btn primary" href="${waLink(p)}">Solicitar fotos</a>`;
+
+    const specs = `<span><b>${p.areaConstruida}</b> m² constr.</span><span><b>${p.areaLote}</b> m² lote</span>` +
+      (p.areaPrivativa ? `<span><b>${p.areaPrivativa}</b> m² privativa</span>` : '');
+
+    const title = p.endereco + (p.casa && !p.endereco.includes('Casa') ? ` · Casa ${p.casa}` : '');
+
+    return `${groupHtml}
+    <div class="card ${statusClass}" id="card-${p.id}">
+      <div class="card-top" onclick='focusMarker(properties.find(x=>x.id==="${p.id}"));'>
+        <div class="card-main">
+          <span class="status-badge ${badgeClass}">${p.situacao}</span>
+          <h3>${title}</h3>
+          <div class="addr-sub">${p.empreendimento}</div>
+          <div class="specs">${specs}</div>
+          <div class="desc"><ul>${p.descricao.map(d => `<li>${d}</li>`).join('')}</ul></div>
+        </div>
+        <div class="price-block">${priceHtml}</div>
+      </div>
+      <div class="actions">
+        ${fotosBtn}
+        <a class="btn" href="${waLink(p)}">Falar no WhatsApp</a>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+bairroSel.addEventListener('change', render);
+situacaoSel.addEventListener('change', render);
+ordenarSel.addEventListener('change', render);
+render();
+
+const mainGrid = document.getElementById('mainGrid');
+document.getElementById('btnViewMap').addEventListener('click', e => {
+  mainGrid.className = 'view-map';
+  e.target.classList.add('active');
+  document.getElementById('btnViewList').classList.remove('active');
+  if(map) setTimeout(() => map.invalidateSize(), 200);
+});
+document.getElementById('btnViewList').addEventListener('click', e => {
+  mainGrid.className = 'view-list';
+  e.target.classList.add('active');
+  document.getElementById('btnViewMap').classList.remove('active');
+});
+</script>
+</body>
+</html>
